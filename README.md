@@ -99,7 +99,7 @@ Note that global properties can be overridden by parameters passed to `trackEven
 This package can be used as a Vue.js plugin:
 
 ```javascript
-import {Analytics} from '@infermedica/modular-analytics';
+import {VueAnalytics} from '@infermedica/modular-analytics';
 
 Vue.use(VueAnalytics);
 ```
