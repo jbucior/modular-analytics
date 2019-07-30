@@ -25,8 +25,57 @@ if (__analytics.debug.isEnabled) {
 }
 
 
+// --- Google Tag Manager ---
+if (__analytics.googleTagManager.isEnabled) {
+  const googleAnalyticsModule = function () {
+    /* eslint-disable */
+    // @formatter:off
+    (function(s,o,g,a,m){a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(document,'script','https://www.googletagmanager.com/gtag/js');
+    // @formatter:on
+    /* eslint-enable */
+
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function (){window.dataLayer.push(arguments);}
+    window.gtag('js', new Date());
+
+    if (__analytics.googleAnalytics.isEnabled) {
+      window.gtag('config', __analytics.googleAnalytics.key, {
+        send_page_view: false,
+        anonymize_ip: true
+      });
+    }
+
+    if (__analytics.googleAdWords.isEnabled) {
+      window.gtag('config', __analytics.googleAdWords.key, {anonymize_ip: true});
+    }
+
+    return {
+      trackView(viewName) {
+        window.gtag('event', 'page_view');
+      },
+      trackEvent(eventName, properties) {
+        window.gtag('event', eventName, {
+          event_category: 'Event'
+        });
+      },
+      trackConversion(conversionLabel) {
+        if (__analytics.googleAdWords.isEnabled) {
+          window.gtag('event', 'conversion', {
+            send_to: __analytics.googleAdWords.key + '/' + conversionLabel
+          });
+        }
+      }
+    };
+  };
+
+  analyticModules.push(googleAnalyticsModule());
+}
+
+
 // --- Google Analytics ---
-if (__analytics.googleAnalytics.isEnabled) {
+else if (__analytics.googleAnalytics.isEnabled) {
   const googleAnalyticsModule = function () {
     /* eslint-disable */
     // @formatter:off

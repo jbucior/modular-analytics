@@ -17,6 +17,11 @@ export const Analytics = {
       );
     });
   },
+  trackConversion(conversionLabel) {
+    analyticModules.forEach((analyticModule) => {
+      analyticModule.trackConversion && analyticModule.trackConversion(conversionLabel);
+    });
+  },
   setGlobalProperties(property, value) {
     if (typeof property === 'object') {
       Object.assign(globalProperties, property);

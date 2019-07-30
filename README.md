@@ -23,6 +23,13 @@ new webpack.DefinePlugin({
       isEnabled: true,
       key: '<your-key>'
     },
+    googleAdWords: {
+      isEnabled: true,
+      key: '<your-key>'
+    },
+    googleTagManager: {
+      isEnabled: true
+    },
     amplitude: {
       isEnabled: true,
       key: '<your-key>'
@@ -75,6 +82,19 @@ Analytics.trackEvent('Event name', {
 });
 ```
 
+### Conversion tracking
+
+To track events, use:
+
+```javascript
+Analytics.trackConversion('conversion-label');
+```
+
+The "conversion-label" will be passed to gtag function as follow:
+```
+window.gtag('event', 'conversion', {send_to: __analytics.googleAdWords.key + '/' + conversionLabel});
+```
+
 ### Setting global properties
 
 You can set global properties that will be automatically added to each tracked event:
@@ -124,6 +144,7 @@ this.$analytics.trackEvent(...);
 
 Currently the following providers are supported:
 * Google Analytics
+* Google Tag Manager (Analytics & AdWords)
 * Amplitude
 
 Other analytics tools are easy to integrate with this module and we might add their support in the future.
