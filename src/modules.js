@@ -3,30 +3,42 @@
 // during dead code elimination process, while editing/refactoring this file please take care,
 // so that the elimination process still works.
 // Also note that each analytics cannot be split into separate files, as it will break code elimination.
+const names = {
+  DEBUG: 'debug',
+  GOOGLE_TAG_MANAGE: 'googleTagManager',
+  GOOGLE_ANALYTICS: 'googleAnalytics',
+  AMPLITUDE: 'amplitude',
+  INFERMEDICA_ANALYTICS: 'infermedicaAnalytics',
+};
 const analyticModules = [];
-
+const filterProperties = (allowProperties = [], disallowProperties = [], properties) => {
+  return Object.keys(properties)
+    .filter((key)=>(allowProperties.length < 1 || allowProperties.includes(key)))
+    .filter((key)=>(disallowProperties.length < 1 || !disallowProperties.includes(key)))
+    .reduce((object, key)=>({...object, [key]: properties[key]}), {});
+};
 
 // --- Debug module ---
-if (__analytics.debug.isEnabled) {
+if (__analytics.debug?.isEnabled) {
   const debugModule = function () {
     console.log('Analytics (initialization)');
 
     return {
+      name: names.DEBUG,
       trackView(viewName) {
         console.log('Analytics (trackView):', viewName);
       },
       trackEvent(eventName, properties) {
         console.log('Analytics (trackEvent):', eventName, properties);
-      }
+      },
     };
   };
 
   analyticModules.push(debugModule());
 }
 
-
 // --- Google Tag Manager ---
-if (__analytics.googleTagManager.isEnabled) {
+if (__analytics.googleTagManager?.isEnabled) {
   const googleAnalyticsModule = function () {
     /* eslint-disable */
     // @formatter:off
@@ -37,45 +49,45 @@ if (__analytics.googleTagManager.isEnabled) {
     /* eslint-enable */
 
     window.dataLayer = window.dataLayer || [];
-    window.gtag = function (){window.dataLayer.push(arguments);}
+    window.gtag = function () { window.dataLayer.push(arguments); };
     window.gtag('js', new Date());
 
     if (__analytics.googleAnalytics.isEnabled) {
       window.gtag('config', __analytics.googleAnalytics.key, {
         send_page_view: false,
-        anonymize_ip: true
+        anonymize_ip: true,
       });
     }
 
     if (__analytics.googleAdWords.isEnabled) {
-      window.gtag('config', __analytics.googleAdWords.key, {anonymize_ip: true});
+      window.gtag('config', __analytics.googleAdWords.key, { anonymize_ip: true });
     }
 
     return {
+      name: names.GOOGLE_TAG_MANAGE,
       trackView(viewName) {
         window.gtag('event', 'page_view');
       },
       trackEvent(eventName, properties) {
         window.gtag('event', eventName, {
-          event_category: 'Event'
+          event_category: 'Event',
         });
       },
       trackConversion(conversionLabel) {
         if (__analytics.googleAdWords.isEnabled) {
           window.gtag('event', 'conversion', {
-            send_to: __analytics.googleAdWords.key + '/' + conversionLabel
+            send_to: `${__analytics.googleAdWords.key}/${conversionLabel}`,
           });
         }
-      }
+      },
     };
   };
 
   analyticModules.push(googleAnalyticsModule());
 }
 
-
 // --- Google Analytics ---
-else if (__analytics.googleAnalytics.isEnabled) {
+else if (__analytics.googleAnalytics?.isEnabled) {
   const googleAnalyticsModule = function () {
     /* eslint-disable */
     // @formatter:off
@@ -90,24 +102,24 @@ else if (__analytics.googleAnalytics.isEnabled) {
     window.ga('set', 'anonymizeIp', true);
 
     return {
+      name: name.GOOGLE_ANALYTICS,
       trackView(viewName) {
         window.ga('send', 'pageview', viewName || window.location.pathname);
       },
       trackEvent(eventName, properties) {
         window.ga('send', 'event', {
           eventCategory: 'Event',
-          eventAction: eventName
+          eventAction: eventName,
         });
-      }
+      },
     };
   };
 
   analyticModules.push(googleAnalyticsModule());
 }
 
-
 // --- Amplitude ---
-if (__analytics.amplitude.isEnabled) {
+if (__analytics.amplitude?.isEnabled) {
   const amplitudeModule = function () {
     /* eslint-disable */
     // @formatter:off
@@ -136,28 +148,136 @@ if (__analytics.amplitude.isEnabled) {
       trackingOptions: {
         carrier: false,
         dma: false,
-        ip_address: false
-      }
+        ip_address: false,
+      },
     });
 
     return {
+      name: names.AMPLITUDE,
       trackView(viewName) {
-        window.amplitude.getInstance().logEvent('Page Viewed', {page: viewName});
+        window.amplitude.getInstance().logEvent('Page Viewed', { page: viewName });
       },
       trackEvent(eventName, properties) {
-        const cleanProperties = {};
-        Object.keys(properties).forEach((propName) => {
-          if (properties[propName] !== null && properties[propName] !== undefined) {
-            cleanProperties[propName] = properties[propName];
-          }
-        });
-        window.amplitude.getInstance().logEvent(eventName, cleanProperties);
-      }
+        const allowProperties = __analytics.amplitude?.allowProperties;
+        const disallowProperties = __analytics.amplitude?.disallowProperties;
+        const filteredProperties = filterProperties(allowProperties, disallowProperties, properties);
+        const payload = Object.keys(filteredProperties).reduce((object, key) => (
+          filteredProperties[key]
+            ? { ...object, [key]: filteredProperties[key] }
+            : object
+        ), {});
+
+        window.amplitude.getInstance().logEvent(eventName, payload);
+      },
     };
   };
 
   analyticModules.push(amplitudeModule());
 }
 
+// --- Infermedica Analytics ---
+(async () => {
+  if (__analytics.infermedicaAnalytics?.isEnabled) {
+    const axios = await import('axios');
+    const Bowser = await import('bowser');
+    const { initializeApp } = await import('firebase/app');
+    const { getAuth, signInAnonymously, onAuthStateChanged } = await import('firebase/auth');
+
+    const infermedicaModule = function () {
+      const baseURL = __analytics.infermedicaAnalytics?.baseURL || 'https://analytics-proxy.infermedica.com/';
+      const { environment, firebaseConfig } = __analytics.infermedicaAnalytics;
+      const browser = Bowser.getParser(window.navigator.userAgent);
+      const headers = {
+        'infer-application-id': __analytics.infermedicaAnalytics?.appId,
+      };
+      const analyticsApi = axios.create({
+        baseURL,
+        headers,
+      });
+      const publish = async function (data) {
+        const publishURL = '/api/v1/publish';
+        const attributes = {
+          environment,
+        };
+        const { topic, ...properties } = data;
+        const events = [
+          {
+            data,
+            attributes,
+          },
+        ];
+        const payload = {
+          topic: topic || __analytics.infermedicaAnalytics.topic,
+          events,
+        };
+
+        await analyticsApi.post(publishURL, payload);
+      };
+
+      const firebaseData = {};
+      initializeApp(firebaseConfig);
+      const auth = getAuth();
+      signInAnonymously(auth);
+      let eventQueue = [];
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) return;
+        firebaseData.uid = user.uid;
+        firebaseData.token = await user.getIdToken();
+        analyticsApi.defaults.headers.Authorization = `Bearer ${firebaseData.token}`;
+        eventQueue.forEach((event) => {
+          const { user } = event;
+          publish({ ...event, user: { ...user, id: firebaseData.uid } });
+        });
+        eventQueue = [];
+      });
+
+      return {
+        name: names.INFERMEDICA_ANALYTICS,
+        trackEvent(eventName, properties) {
+          // prevent to send event without event_details
+          if (!properties.event_details) {
+            return;
+          }
+          const allowProperties = __analytics.infermedicaAnalytics?.allowProperties;
+          const disallowProperties = __analytics.infermedicaAnalytics?.disallowProperties;
+          const filteredProperties = filterProperties(allowProperties, disallowProperties, properties);
+          const date = new Date();
+          const { uid } = firebaseData;
+          const { user, application } = filteredProperties;
+          const data = {
+            ...filteredProperties,
+            date,
+            application: {
+              ...application,
+            },
+            user: {
+              ...user,
+              id: uid,
+              browser: browser.getBrowser(),
+              os: browser.getOS(),
+              platform: browser.getPlatform(),
+            },
+            event_details: {
+              event_type: '',
+              event_object: '',
+              event_data: {
+                type: '',
+                data: [],
+              },
+              ...filteredProperties.event_details,
+            },
+          };
+          if (!uid) {
+            eventQueue.push(data);
+            return;
+          }
+          publish(data);
+        },
+      };
+    };
+
+    analyticModules.push(infermedicaModule());
+  }
+})();
 
 export default analyticModules;
