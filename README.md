@@ -40,12 +40,7 @@ new webpack.DefinePlugin({
       isEnabled: true,
       topic: '<your-topic>',
       environment: process.env.NODE_ENV,
-      sendUID: false, // false by default, allow to send firebase UID 
-      firebaseConfig: {
-        apiKey: '<your-firebase-api-key>',
-        authDomain: '<your-firebase-auth-domain>',
-        appId: '<your-firebase-app-id>',
-      },
+      sendUID: false, // allow to send firebase UID, false by default 
       allowProperties: ['application', 'user', 'section', 'event_details'], // optional
       disallowProperties: [], // optional
     },
@@ -97,7 +92,7 @@ Analytics.trackEvent('Event name', {
 });
 ```
 
-You can use the event for all modules or decide with modules should be used for this event, e.g.:
+You can use the event for all modules or decide which modules should be used for this event, e.g.:
 
 ```javascript
 Analytics.trackEvent('Event name', {
@@ -136,6 +131,49 @@ Analytics.setGlobalProperties({
 ```
 
 Note that global properties can be overridden by parameters passed to `trackEvent` calls.
+
+### Initializing `infermedicaAnalytics` module
+#### In order to use `infermedicaAnalytics` module you must initialize it first.
+
+You can decide if you want to use Firebase **anonymously** or as **identified user**. In order to use `infermedicaAnalytics` 
+module of this package you should call `initialize()` method and pass it an object which matches the following type:
+
+```typescript
+type InitializeParams = IAnonymousInitializeParams | IAuthenticatedInitializeParams;
+
+interface IAnonymousInitializeParams {
+  firebaseConfig: FirebaseOptions,
+  forceSignInAnonymously: true,
+}
+
+interface IAuthenticatedInitializeParams {
+  firebaseAuth: Auth,
+  forceSignInAnonymously: false,
+}
+```
+
+If you want to let the library sign you in to firebase as anonymous user, you should call the `initialize()` method with an object corresponding to the `IAnonymousInitializeParams` `interface`, e.g.:
+
+```javascript
+import { Analytics } from '@infermedica/modular-analytics';
+
+const firebaseConfig = { /* your firebase config */ };
+Analytics.initialize({ firebaseConfig, forceSignInAnonymously: true });
+```
+
+In case you need to handle firebase-authentication on your side, do it and then initialize Analytics library by passing object corresponding to the `IAuthenticatedInitializeParams` `interface`, e.g.:
+
+```javascript
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { Analytics } from '@infermedica/modular-analytics';
+
+const firebaseConfig = { /* your firebase config */ }; 
+
+const firebaseApp = initializeApp(firebaseConfig);
+const firebaseAuth = getAuth(firebaseApp);
+Analytics.initialize({ firebaseAuth, forceSignInAnonymously: false });
+```
 
 ### Usage with Vue.js
 

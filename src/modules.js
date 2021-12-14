@@ -11,9 +11,16 @@ const names = {
   INFERMEDICA_ANALYTICS: 'infermedicaAnalytics',
 };
 const analyticModules = [];
-const filterProperties = (allowProperties = [], disallowProperties = [], properties) => Object.keys(properties)
-  .filter((key) => (allowProperties.length < 1 || allowProperties.includes(key)))
-  .filter((key) => (disallowProperties.length < 1 || !disallowProperties.includes(key)))
+const filterProperties = (
+  allowProperties = [], disallowProperties = [], properties,
+) => Object.keys(
+  properties,
+)
+  .filter(
+    (key) => (allowProperties.length < 1 || allowProperties.includes(key)),
+  )
+  .filter((key) => (disallowProperties.length < 1
+    || !disallowProperties.includes(key)))
   .reduce((object, key) => ({ ...object, [key]: properties[key] }), {});
 
 // --- Debug module ---
@@ -47,7 +54,9 @@ if (__analytics.googleTagManager?.isEnabled) {
     /* eslint-enable */
 
     window.dataLayer = window.dataLayer || [];
-    window.gtag = function () { window.dataLayer.push(arguments); };
+    window.gtag = function () {
+      window.dataLayer.push(arguments);
+    };
     window.gtag('js', new Date());
 
     if (__analytics.googleAnalytics.isEnabled) {
@@ -58,15 +67,16 @@ if (__analytics.googleTagManager?.isEnabled) {
     }
 
     if (__analytics.googleAdWords.isEnabled) {
-      window.gtag('config', __analytics.googleAdWords.key, { anonymize_ip: true });
+      window.gtag('config', __analytics.googleAdWords.key,
+        { anonymize_ip: true });
     }
 
     return {
       name: names.GOOGLE_TAG_MANAGE,
-      trackView(viewName) {
+      trackView() {
         window.gtag('event', 'page_view');
       },
-      trackEvent(eventName, properties) {
+      trackEvent(eventName) {
         window.gtag('event', eventName, {
           event_category: 'Event',
         });
@@ -96,7 +106,8 @@ else if (__analytics.googleAnalytics?.isEnabled) {
     // @formatter:on
     /* eslint-enable */
 
-    window.ga('create', __analytics.googleAnalytics.key, window.location.hostname);
+    window.ga('create', __analytics.googleAnalytics.key,
+      window.location.hostname);
     window.ga('set', 'anonymizeIp', true);
 
     return {
@@ -104,7 +115,7 @@ else if (__analytics.googleAnalytics?.isEnabled) {
       trackView(viewName) {
         window.ga('send', 'pageview', viewName || window.location.pathname);
       },
-      trackEvent(eventName, properties) {
+      trackEvent(eventName) {
         window.ga('send', 'event', {
           eventCategory: 'Event',
           eventAction: eventName,
@@ -153,17 +164,20 @@ if (__analytics.amplitude?.isEnabled) {
     return {
       name: names.AMPLITUDE,
       trackView(viewName) {
-        window.amplitude.getInstance().logEvent('Page Viewed', { page: viewName });
+        window.amplitude.getInstance()
+          .logEvent('Page Viewed', { page: viewName });
       },
       trackEvent(eventName, properties) {
         const allowProperties = __analytics.amplitude?.allowProperties;
         const disallowProperties = __analytics.amplitude?.disallowProperties;
-        const filteredProperties = filterProperties(allowProperties, disallowProperties, properties);
-        const payload = Object.keys(filteredProperties).reduce((object, key) => (
-          filteredProperties[key]
-            ? { ...object, [key]: filteredProperties[key] }
-            : object
-        ), {});
+        const filteredProperties = filterProperties(allowProperties,
+          disallowProperties, properties);
+        const payload = Object.keys(filteredProperties)
+          .reduce((object, key) => (
+            filteredProperties[key]
+              ? { ...object, [key]: filteredProperties[key] }
+              : object
+          ), {});
 
         window.amplitude.getInstance().logEvent(eventName, payload);
       },
@@ -174,114 +188,142 @@ if (__analytics.amplitude?.isEnabled) {
 }
 
 // --- Infermedica Analytics ---
-(async () => {
-  if (__analytics.infermedicaAnalytics?.isEnabled) {
-    const axios = await import('axios');
-    const Bowser = await import('bowser');
-    const { initializeApp } = await import('firebase/app');
-    const { getAuth, signInAnonymously, onAuthStateChanged } = await import('firebase/auth');
+if (__analytics.infermedicaAnalytics?.isEnabled) {
+  const infermedicaModule = function () {
+    const baseURL = __analytics.infermedicaAnalytics?.baseURL
+      || 'https://analytics-proxy.infermedica.com/';
+    const {
+      environment,
+    } = __analytics.infermedicaAnalytics;
+    const headers = {
+      'infer-application-id': __analytics.infermedicaAnalytics?.appId,
+    };
+    let analyticsApi = null;
+    let browser = null;
+    let auth = null;
+    let eventQueue = [];
+    let firebaseUser = null;
 
-    const infermedicaModule = function () {
-      const baseURL = __analytics.infermedicaAnalytics?.baseURL || 'https://analytics-proxy.infermedica.com/';
-      const { environment, firebaseConfig } = __analytics.infermedicaAnalytics;
-      const browser = Bowser.getParser(window.navigator.userAgent);
-      const headers = {
-        'infer-application-id': __analytics.infermedicaAnalytics?.appId,
+    const publish = async function (data) {
+      const publishURL = '/api/v1/publish';
+      const attributes = {
+        environment,
       };
-      const analyticsApi = axios.create({
-        baseURL,
-        headers,
-      });
-      let firebaseUser = null;
-      const publish = async function (data) {
-        const publishURL = '/api/v1/publish';
-        const attributes = {
-          environment,
-        };
-        const { topic, ...properties } = data;
-        const events = [
-          {
-            data,
-            attributes,
-          },
-        ];
-        const payload = {
-          topic: topic || __analytics.infermedicaAnalytics.topic,
-          events,
-        };
-        const token = await firebaseUser.getIdToken();
-        analyticsApi.defaults.headers.Authorization = `Bearer ${token}`;
-        await analyticsApi.post(publishURL, payload);
-      };
-      initializeApp(firebaseConfig);
-      const auth = getAuth();
-      signInAnonymously(auth);
-      let eventQueue = [];
-      const getUid = () => (__analytics.infermedicaAnalytics?.sendUID
-        ? firebaseUser.uid
-        : null);
-      onAuthStateChanged(auth, async (user) => {
-        if (!user) return;
-        firebaseUser = user;
-        eventQueue.forEach((event) => {
-          const { user } = event;
-          publish({
-            ...event,
-            user: {
-              ...user,
-              id: getUid(),
-            },
-          });
-        });
-        eventQueue = [];
-      });
-
-      return {
-        name: names.INFERMEDICA_ANALYTICS,
-        trackEvent(eventName, properties) {
-          // prevent to send event without event_details
-          if (!properties.event_details) {
-            return;
-          }
-          const allowProperties = __analytics.infermedicaAnalytics?.allowProperties;
-          const disallowProperties = __analytics.infermedicaAnalytics?.disallowProperties;
-          const filteredProperties = filterProperties(allowProperties, disallowProperties, properties);
-          const date = new Date();
-          const { user, application } = filteredProperties;
-          const data = {
-            ...filteredProperties,
-            date,
-            application: {
-              ...application,
-            },
-            user: {
-              ...user,
-              id: getUid(),
-              browser: browser.getBrowser(),
-              os: browser.getOS(),
-              platform: browser.getPlatform(),
-            },
-            event_details: {
-              event_type: '',
-              event_object: '',
-              event_data: {
-                type: '',
-                data: [],
-              },
-              ...filteredProperties.event_details,
-            },
-          };
-          if (!firebaseUser) {
-            eventQueue.push(data);
-            return;
-          }
-          publish(data);
+      const { topic } = data;
+      const events = [
+        {
+          data,
+          attributes,
         },
+      ];
+      const payload = {
+        topic: topic || __analytics.infermedicaAnalytics.topic,
+        events,
       };
+      const token = await firebaseUser.getIdToken();
+      analyticsApi.defaults.headers.Authorization = `Bearer ${token}`;
+      await analyticsApi.post(publishURL, payload);
     };
 
-    analyticModules.push(infermedicaModule());
-  }
-})();
+    const getUid = () => (__analytics.infermedicaAnalytics?.sendUID
+      ? firebaseUser.uid
+      : null);
+
+    return {
+      name: names.INFERMEDICA_ANALYTICS,
+      /**
+       * @param {import('./main').InitializeParams} options
+       */
+      initialize: async (options) => {
+        const Bowser = await import('bowser');
+        const axios = await import('axios');
+        const { onAuthStateChanged } = await import('firebase/auth');
+
+        browser = Bowser.getParser(window.navigator.userAgent);
+        analyticsApi = axios.create({
+          baseURL,
+          headers,
+        });
+
+        if ('firebaseAuth' in options && !options.forceSignInAnonymously) {
+          auth = options.firebaseAuth;
+        } else if ('firebaseConfig' in options
+          && options.forceSignInAnonymously) {
+          const {
+            signInAnonymously,
+            getAuth,
+          } = await import('firebase/auth');
+          const { initializeApp } = await import('firebase/app');
+
+          const firebaseApp = initializeApp(options.firebaseConfig);
+          auth = getAuth(firebaseApp);
+          await signInAnonymously(auth);
+        }
+
+        onAuthStateChanged(auth, async (authUser) => {
+          if (!authUser) return;
+          firebaseUser = authUser;
+          eventQueue.forEach((event) => {
+            const { user } = event;
+            publish({
+              ...event,
+              user: {
+                ...user,
+                id: getUid(),
+              },
+            });
+          });
+          eventQueue = [];
+        });
+      },
+      /**
+       * @param { string } eventName
+       * @param { object } properties
+       */
+      async trackEvent(eventName, properties) {
+        // prevent to send event without event_details
+        if (!properties.event_details) {
+          return;
+        }
+        const allowProperties = __analytics.infermedicaAnalytics?.allowProperties;
+        const disallowProperties = __analytics.infermedicaAnalytics?.disallowProperties;
+        const filteredProperties = filterProperties(allowProperties,
+          disallowProperties, properties);
+        const date = new Date();
+        const { user, application } = filteredProperties;
+        const data = {
+          ...filteredProperties,
+          date,
+          application: {
+            ...application,
+          },
+          user: {
+            ...user,
+            id: getUid(),
+            browser: browser.getBrowser(),
+            os: browser.getOS(),
+            platform: browser.getPlatform(),
+          },
+          event_details: {
+            event_type: '',
+            event_object: '',
+            event_data: {
+              type: '',
+              data: [],
+            },
+            ...filteredProperties.event_details,
+          },
+        };
+        if (!firebaseUser) {
+          eventQueue.push(data);
+          return;
+        }
+        await publish(data);
+      },
+    };
+  };
+
+  analyticModules.push(infermedicaModule());
+}
 
 export default analyticModules;
