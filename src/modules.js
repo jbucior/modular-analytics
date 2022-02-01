@@ -24,7 +24,7 @@ const filterProperties = (
   .reduce((object, key) => ({ ...object, [key]: properties[key] }), {});
 
 // --- Debug module ---
-if (__analytics.debug?.isEnabled) {
+if (__analytics.debug.isEnabled) {
   const debugModule = function () {
     console.log('Analytics (initialization)');
 
@@ -43,7 +43,7 @@ if (__analytics.debug?.isEnabled) {
 }
 
 // --- Google Tag Manager ---
-if (__analytics.googleTagManager?.isEnabled) {
+if (__analytics.googleTagManager.isEnabled) {
   const googleAnalyticsModule = function () {
     /* eslint-disable */
     // @formatter:off
@@ -95,7 +95,7 @@ if (__analytics.googleTagManager?.isEnabled) {
 }
 
 // --- Google Analytics ---
-else if (__analytics.googleAnalytics?.isEnabled) {
+else if (__analytics.googleAnalytics.isEnabled) {
   const googleAnalyticsModule = function () {
     /* eslint-disable */
     // @formatter:off
@@ -111,7 +111,7 @@ else if (__analytics.googleAnalytics?.isEnabled) {
     window.ga('set', 'anonymizeIp', true);
 
     return {
-      name: name.GOOGLE_ANALYTICS,
+      name: names.GOOGLE_ANALYTICS,
       trackView(viewName) {
         window.ga('send', 'pageview', viewName || window.location.pathname);
       },
@@ -128,7 +128,7 @@ else if (__analytics.googleAnalytics?.isEnabled) {
 }
 
 // --- Amplitude ---
-if (__analytics.amplitude?.isEnabled) {
+if (__analytics.amplitude.isEnabled) {
   const amplitudeModule = function () {
     /* eslint-disable */
     // @formatter:off
@@ -188,8 +188,9 @@ if (__analytics.amplitude?.isEnabled) {
 }
 
 // --- Infermedica Analytics ---
-if (__analytics.infermedicaAnalytics?.isEnabled) {
+if (__analytics.infermedicaAnalytics.isEnabled) {
   const infermedicaModule = function () {
+    const useFirebase = __analytics.infermedicaAnalytics?.useFirebase;
     const baseURL = __analytics.infermedicaAnalytics?.baseURL
       || 'https://analytics-proxy.infermedica.com/';
     const {
@@ -220,13 +221,15 @@ if (__analytics.infermedicaAnalytics?.isEnabled) {
         topic: topic || __analytics.infermedicaAnalytics.topic,
         events,
       };
-      const token = await firebaseUser.getIdToken();
-      analyticsApi.defaults.headers.Authorization = `Bearer ${token}`;
+      if (useFirebase) {
+        const token = await firebaseUser.getIdToken();
+        analyticsApi.defaults.headers.Authorization = `Bearer ${token}`;
+      }
       await analyticsApi.post(publishURL, payload);
     };
 
-    const getUid = () => (__analytics.infermedicaAnalytics?.sendUID
-      ? firebaseUser.uid
+    const getUid = () => (useFirebase && __analytics.infermedicaAnalytics?.sendUID
+      ? firebaseUser?.uid
       : null);
 
     const initializeBrowser = async () => {
@@ -243,9 +246,9 @@ if (__analytics.infermedicaAnalytics?.isEnabled) {
        * @param {import('./main').InitializeParams} options
        */
       initialize: async (options) => {
-        const [axios, { onAuthStateChanged }] = await Promise.all([
+        const { forceSignInAnonymously, firebaseAuth, firebaseConfig } = options;
+        const [axios] = await Promise.all([
           import('axios'),
-          import('firebase/auth'),
           initializeBrowser(),
         ]);
 
@@ -254,32 +257,40 @@ if (__analytics.infermedicaAnalytics?.isEnabled) {
           headers,
         });
 
-        if ('firebaseAuth' in options && !options.forceSignInAnonymously) {
-          auth = options.firebaseAuth;
-        } else if ('firebaseConfig' in options
-          && options.forceSignInAnonymously) {
-          const [{ signInAnonymously, getAuth }, { initializeApp }] = await Promise.all([import('firebase/auth'), import('firebase/app')]);
+        // Use directly from __analytics to support tree shaking
+        if (__analytics.infermedicaAnalytics.useFirebase) {
+          const initializeFirebase = async () => {
+            const { onAuthStateChanged } = await import('firebase/auth');
+            if (firebaseAuth && !forceSignInAnonymously) {
+              auth = firebaseAuth;
+            } else if (firebaseConfig && forceSignInAnonymously) {
+              const [{ signInAnonymously, getAuth }, { initializeApp }] = await Promise.all([
+                import('firebase/auth'),
+                import('firebase/app'),
+              ]);
+              const firebaseApp = initializeApp(firebaseConfig);
+              auth = getAuth(firebaseApp);
+              await signInAnonymously(auth);
+            }
 
-          const firebaseApp = initializeApp(options.firebaseConfig);
-          auth = getAuth(firebaseApp);
-          await signInAnonymously(auth);
-        }
-
-        onAuthStateChanged(auth, async (authUser) => {
-          if (!authUser) return;
-          firebaseUser = authUser;
-          eventQueue.forEach((event) => {
-            const { user } = event;
-            publish({
-              ...event,
-              user: {
-                ...user,
-                id: getUid(),
-              },
+            onAuthStateChanged(auth, async (authUser) => {
+              if (!authUser) return;
+              firebaseUser = authUser;
+              eventQueue.forEach((event) => {
+                const { user } = event;
+                publish({
+                  ...event,
+                  user: {
+                    ...user,
+                    id: getUid(),
+                  },
+                });
+              });
+              eventQueue = [];
             });
-          });
-          eventQueue = [];
-        });
+          };
+          initializeFirebase();
+        }
       },
       /**
        * @param { string } eventName
@@ -320,7 +331,7 @@ if (__analytics.infermedicaAnalytics?.isEnabled) {
             ...filteredProperties.event_details,
           },
         };
-        if (!firebaseUser) {
+        if (useFirebase && !firebaseUser) {
           eventQueue.push(data);
           return;
         }
