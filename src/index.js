@@ -10,15 +10,10 @@ export const Analytics = {
   /**
    * @param {import("./main").InitializeParams} options
    */
-  initialize(options) {
-    const optionsData = {
-      firebaseAuth: null,
-      forceSignInAnonymously: false,
-      ...options,
-    };
-    analyticModules
-      .forEach((analyticModule) => analyticModule.initialize
-      && analyticModule.initialize(optionsData));
+  async initialize(options) {
+    await Promise.all(analyticModules
+      .map(async (analyticModule) => analyticModule.initialize
+      && analyticModule.initialize(options)));
   },
 
   /**
