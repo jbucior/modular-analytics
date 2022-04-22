@@ -1,7 +1,7 @@
 {
   "name": "@infermedica/modular-analytics",
   "description": "Modular analytics interface",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "author": "Infermedica",
   "license": "MIT",
   "main": "src/index.js",
@@ -18,7 +18,9 @@
     "analytics"
   ],
   "eslintConfig": {
-    "plugins": ["jest"],
+    "plugins": [
+      "jest"
+    ],
     "env": {
       "browser": true,
       "es2021": true,
@@ -31,21 +33,24 @@
       "ecmaVersion": 2021,
       "sourceType": "module"
     },
-    "rules": {}
+    "rules": {
+      "max-len": ["error", { "code": 120 }]
+    }
   },
   "scripts": {
-    "lint": "eslint src/*js --fix",
+    "lint": "eslint \"**/*.js\" --fix",
     "check": "tsc --noEmit --moduleResolution node --allowJs --target es6 --lib es2016,dom src/*.js",
     "test": "jest"
   },
   "devDependencies": {
     "@babel/core": "^7.17.8",
     "@babel/preset-env": "^7.16.11",
-    "eslint-plugin-jest": "^26.1.3",
     "babel-jest": "^27.5.1",
+    "babel-plugin-rewire": "^1.2.0",
     "eslint": "^7.32.0",
     "eslint-config-airbnb-base": "^14.2.1",
     "eslint-plugin-import": "^2.25.2",
+    "eslint-plugin-jest": "^26.1.3",
     "jest": "^27.5.1"
   },
   "dependencies": {
