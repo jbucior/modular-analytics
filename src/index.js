@@ -66,17 +66,3 @@ export const Analytics = {
     }
   },
 };
-
-export const VueAnalytics = {
-  install: (Vue) => {
-    Vue.$analytics = Analytics; // eslint-disable-line no-param-reassign
-
-    Object.defineProperties(Vue.prototype, {
-      $analytics: {
-        get() {
-          return Vue.$analytics;
-        },
-      },
-    });
-  },
-};
