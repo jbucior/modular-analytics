@@ -1,13 +1,13 @@
 {
   "name": "@infermedica/modular-analytics",
   "description": "Modular analytics interface",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "author": "Infermedica",
   "license": "MIT",
   "main": "src/index.js",
   "exports": {
-    ".": "src/index.js",
-    "./vue": "src/vue.js"
+    ".": "./src/index.js",
+    "./vue": "./src/vue.js"
   },
   "repository": {
     "type": "git",
