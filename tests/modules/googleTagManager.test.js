@@ -10,8 +10,8 @@ beforeEach(() => {
 describe('module/googleTagManager', () => {
   test('return [] when googleTagManager is disabled', async () => {
     __analytics.googleTagManager.isEnabled = false;
-    analyticModules = await import('../../src/modules');
-    expect(analyticModules).toEqual({ default: [] });
+    ({ default: analyticModules } = await import('../../src/modules'));
+    expect(analyticModules).toEqual([]);
   });
   test('return correct track view', async () => {
     analyticModules = await import('../../src/modules');
@@ -41,6 +41,11 @@ describe('module/googleTagManager', () => {
     const { trackConversion } = analyticModules.default[0];
     window.gtag = jest.fn();
     trackConversion(testString);
-    expect(window.gtag).toHaveBeenCalledWith('event', 'conversion', { send_to: `${__analytics.googleAdWords.key}/${testString}` });
+    expect(window.gtag)
+      .toHaveBeenCalledWith(
+        'event',
+        'conversion',
+        { send_to: `${__analytics.googleAdWords.key}/${testString}` },
+      );
   });
 });

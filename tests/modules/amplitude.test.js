@@ -11,8 +11,8 @@ beforeEach(() => {
 describe('module/amplitude', () => {
   test('return [] when amplitude is disabled', async () => {
     __analytics.amplitude.isEnabled = false;
-    analyticModules = await import('../../src/modules');
-    expect(analyticModules).toEqual({ default: [] });
+    ({ default: analyticModules } = await import('../../src/modules'));
+    expect(analyticModules).toEqual([]);
   });
   test('return correct track view', async () => {
     analyticModules = await import('../../src/modules');
@@ -44,6 +44,7 @@ describe('module/amplitude', () => {
     const { trackEvent } = analyticModules.default[0];
     window.amplitude.getInstance().logEvent = jest.fn();
     trackEvent(testString, testProperties);
-    expect(window.amplitude.getInstance().logEvent).toHaveBeenCalledWith(testString, { test2: 'test2', test3: 'test3' });
+    expect(window.amplitude.getInstance().logEvent)
+      .toHaveBeenCalledWith(testString, { test2: 'test2', test3: 'test3' });
   });
 });
