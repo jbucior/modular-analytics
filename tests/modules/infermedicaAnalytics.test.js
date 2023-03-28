@@ -18,18 +18,24 @@ const expectedPayload = {
         event_type: '',
       },
       user: {
-        browser: 'browser',
         id: null,
-        os: 'os',
-        platform: 'platform',
+        browser: { name: '', version: '' },
+        os: { name: '' },
+        platform: { type: 'desktop' },
+        user_agent: 'user_agent',
       },
     },
   }],
   topic: 'test',
 };
-jest.mock('bowser', () => ({
-  getParser: () => ({ getBrowser: () => 'browser', getOS: () => 'os', getPlatform: () => 'platform' }),
-}));
+jest.mock('ua-parser-js', () => (
+  () => ({
+    browser: {},
+    os: {},
+    device: {},
+    ua: 'user_agent',
+  })
+));
 
 const mockPost = jest.fn((_, request) => request);
 jest.doMock('axios', () => ({
