@@ -34,12 +34,16 @@ export const Analytics = {
    * @param {object} properties
    * @param {Array} modules
    */
-  async trackEvent(eventName, properties, modules) {
-    analyticModules.forEach((analyticModule) => {
-      if ((modules && !modules.includes(analyticModule.name))
-        || !('trackEvent' in analyticModule)) return;
-      analyticModule.trackEvent(eventName, { ...globalProperties, ...properties });
-    });
+  trackEvent(eventName, properties, modules) {
+    const responses = analyticModules.map((analyticModule) => {
+      const moduleRegistered = modules && modules.includes(analyticModule.name);
+      const hasTrackEvent = ('trackEvent' in analyticModule);
+
+      if (!moduleRegistered || !hasTrackEvent) return [];
+      return analyticModule.trackEvent(eventName, { ...globalProperties, ...properties });
+    }).flat();
+
+    return Promise.all(responses);
   },
 
   /**
@@ -62,4 +66,5 @@ export const Analytics = {
     }
   },
 };
+
 export default Analytics;
