@@ -1,7 +1,7 @@
 {
   "name": "@infermedica/modular-analytics",
   "description": "Modular analytics interface",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "author": "Infermedica",
   "license": "MIT",
   "main": "src/index.js",
