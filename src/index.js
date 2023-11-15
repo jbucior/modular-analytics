@@ -17,19 +17,6 @@ export const Analytics = {
   },
 
   /**
-   * @param {string} viewName
-   * @param {object} properties
-   * @param {Array} modules
-   */
-  trackView(viewName, properties, modules) {
-    analyticModules.forEach((analyticModule) => {
-      if ((modules && !modules.includes(analyticModule.name))
-        || !('trackView' in analyticModule)) return;
-      analyticModule.trackView(viewName, { ...globalProperties, ...properties });
-    });
-  },
-
-  /**
    * @param {string} eventName
    * @param {object} properties
    * @param {Array} modules
@@ -50,18 +37,12 @@ export const Analytics = {
   },
 
   /**
-   * @param {string} conversionLabel
-   */
-  trackConversion(conversionLabel) {
-    analyticModules.forEach((analyticModule) => analyticModule.trackConversion
-      && analyticModule.trackConversion(conversionLabel));
-  },
-
-  /**
    * @param {string|object} property
    * @param {Record<string, unknown> | string} value
    */
   setGlobalProperties(property, value) {
+    console.log('property: ', property);
+    console.log('value: ', value);
     if (typeof property === 'object') {
       Object.assign(globalProperties, property);
     } else if (typeof property === 'string') {
